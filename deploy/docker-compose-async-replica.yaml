@@ -1,0 +1,45 @@
+# docker-compose -f docker-compose-async-replica.yaml up --build
+version: "3.9"
+services:
+  postgresql-master:
+    image: bitnami/postgresql:latest
+    container_name: pg_master
+    ports:
+      - '4444:5432'
+    volumes:
+      - postgresql_master_data:/bitnami/postgresql
+      - ./init-scripts/import-data-async.sh:/docker-entrypoint-initdb.d/import-data-async.sh
+      - ./thai_medium.tar.gz:/tmp/thai_medium.tar.gz # заранее скачать файл
+    environment:
+      - POSTGRESQL_PGAUDIT_LOG=READ,WRITE
+      - POSTGRESQL_LOG_HOSTNAME=true
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_user
+      - POSTGRESQL_USERNAME=postgres
+      - POSTGRESQL_PASSWORD=postgres
+      - POSTGRESQL_DATABASE=thai
+      - ALLOW_EMPTY_PASSWORD=yes
+
+  # асинхронная репликация — это стандартный режим
+  postgresql-async:
+    image: bitnami/postgresql:latest
+    container_name: pg_async
+    ports:
+      - '4445:5432'
+    depends_on:
+      - postgresql-master
+    environment:
+      - POSTGRESQL_PASSWORD=postgres
+      - POSTGRESQL_MASTER_HOST=postgresql-master
+      - POSTGRESQL_PGAUDIT_LOG=READ
+      - POSTGRESQL_LOG_HOSTNAME=true
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_user
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+      - ALLOW_EMPTY_PASSWORD=yes
+
+volumes:
+  postgresql_master_data:
+    driver: local
